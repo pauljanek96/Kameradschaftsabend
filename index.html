@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Wo wurde das Foto gemacht?</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 10px;
+}
+
+h2 {
+  margin-top: 10px;
+}
+
+img {
+  max-width: 95%;
+  max-height: 300px;
+  margin-bottom: 10px;
+}
+
+#map {
+  height: 400px;
+  margin: 10px;
+}
+
+button {
+  padding: 12px 24px;
+  font-size: 16px;
+  margin: 5px;
+}
+
+#ergebnis {
+  font-size: 18px;
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Wo wurde dieses Foto aufgenommen?</h2>
+
+<img id="foto" src="Autohaus.jpg" alt="Foto">
+
+<div id="map"></div>
+
+<button onclick="auswerten()">Antwort abgeben</button>
+<button onclick="naechsterOrt()" id="nextBtn" disabled>Nächster Ort</button>
+
+<p id="ergebnis"></p>
+
+<script>
+// ------------------------
+// ORTE
+// ------------------------
+const orte = [
+  { bild: "Autohaus.jpg",   pos: [50.68515069193782, 8.301681606586012] },
+  { bild: "Dorfmitte.jpg",  pos: [50.684687, 8.188742] },
+  { bild: "KleinSehen.jpg", pos: [50.687836, 8.194520] },
+  { bild: "Spielplatz.jpg", pos: [50.689041, 8.218959] },
+  { bild: "Schoenbach.jpg", pos: [50.667700, 8.222957] },
+  { bild: "Erdbach.jpg",    pos: [50.690117, 8.221189] }
+];
+
+let aktuellerOrt = 0;
+let richtigePosition = orte[aktuellerOrt].pos;
+
+// ------------------------
+// FESTE STARTANSICHT
+// ------------------------
+const startCenter = [50.687687, 8.251990];
+
+const startBounds = L.latLngBounds(
+  [50.682763, 8.193915],
+  [50.687140, 8.315894]
+);
+
+let tipp = null;
+let marker = null;
+let zielMarker = null;
+let linie = null;
+
+// ------------------------
+// KARTE
+// ------------------------
+const map = L.map('map');
+map.setView(startCenter, 13);
+map.fitBounds(startBounds);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+map.on('click', function(e) {
+  if (zielMarker) return;
+
+  tipp = e.latlng;
+
+  if (marker) map.removeLayer(marker);
+  marker = L.marker(tipp).addTo(map);
+});
+
+// ------------------------
+// ENTFERNUNG
+// ------------------------
+function haversine(start, ende) {
+  const R = 6371000;
+  const dLat = (ende.lat - start[0]) * Math.PI / 180;
+  const dLon = (ende.lng - start[1]) * Math.PI / 180;
+  const lat1 = start[0] * Math.PI / 180;
+  const lat2 = ende.lat * Math.PI / 180;
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) *
+    Math.sin(dLon / 2) ** 2;
+
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+// ------------------------
+// AUSWERTEN
+// ------------------------
+function auswerten() {
+  if (!tipp) {
+    alert("Bitte zuerst auf die Karte klicken!");
+    return;
+  }
+
+  const entfernung = haversine(richtigePosition, tipp);
+  document.getElementById("ergebnis").innerText =
+    `Du warst ${entfernung} Meter vom richtigen Ort entfernt.`;
+
+  zielMarker = L.circleMarker(richtigePosition, {
+    radius: 10,
+    fillColor: "#ff0000",
+    color: "#000",
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.8
+  }).addTo(map).bindPopup("Hier war es!").openPopup();
+
+  linie = L.polyline([tipp, richtigePosition], {
+    color: 'red',
+    weight: 3,
+    dashArray: '10,10'
+  }).addTo(map);
+
+  map.fitBounds([tipp, richtigePosition], { padding: [50, 50] });
+
+  document.getElementById("nextBtn").disabled = false;
+}
+
+// ------------------------
+// NÄCHSTER ORT
+// ------------------------
+function naechsterOrt() {
+  aktuellerOrt++;
+
+  if (aktuellerOrt >= orte.length) {
+    alert("🎉 Spiel beendet! Alle Orte erraten.");
+    return;
+  }
+
+  richtigePosition = orte[aktuellerOrt].pos;
+  document.getElementById("foto").src = orte[aktuellerOrt].bild;
+
+  // Reset
+  tipp = null;
+  document.getElementById("ergebnis").innerText = "";
+  document.getElementById("nextBtn").disabled = true;
+
+  if (marker) map.removeLayer(marker);
+  if (zielMarker) map.removeLayer(zielMarker);
+  if (linie) map.removeLayer(linie);
+
+  marker = zielMarker = linie = null;
+
+  // 🔁 immer exakt gleiche Startansicht
+  map.setView(startCenter);
+  map.fitBounds(startBounds);
+}
+</script>
+
+</body>
+</html>
